@@ -53,7 +53,7 @@ int main()
     for (i = 0; i < inputSize; i++)
     {
         newInputsize++;
-        if (input[i] == input[i+1])
+        if ((i + 1 < inputSize) && (input[i] == input[i+1]))
         {
             // Number match
             i++;
@@ -63,12 +63,17 @@ int main()
     //printf("New Data Size = %d\n", newInputsize);
 
     ///Dynamic Memory Allocation -> We can use LinkLists as well.
-    values = (char *)calloc(0, newInputsize * sizeof(char));
+    values = (char *)calloc((size_t)newInputsize, sizeof(char));
+    if (values == NULL)
+    {
+        fprintf(stderr, "Couldn't allocate compression buffer\n");
+        return EXIT_FAILURE;
+    }
 
     for (i = 0; i < inputSize; i++)
     {
         values[j] = input[i];
-        if (input[i] == input[i+1])
+        if ((i + 1 < inputSize) && (input[i] == input[i+1]))
         {
             // Match -> Set top
             values[j] |= 0x80;
@@ -98,19 +103,51 @@ int main()
 
     /// Store Data to File
     fileptr = fopen("Data.bin", "wb");    // w for write, b for binary
-    fwrite(values, newInputsize, 1, fileptr);
+    if (fileptr == NULL)
+    {
+        perror("Data.bin");
+        free(values);
+        return EXIT_FAILURE;
+    }
+    if (fwrite(values, sizeof(char), (size_t)newInputsize, fileptr) != (size_t)newInputsize)
+    {
+        perror("Data.bin");
+        fclose(fileptr);
+        free(values);
+        return EXIT_FAILURE;
+    }
     fclose(fileptr);
 
     /// TODO: if more data needs to be added, use realloc to reassign a memory and continue
 
     /// Read Data from File
     fileptr = fopen("Data.bin", "rb");    // r for read, b for binary
+    if (fileptr == NULL)
+    {
+        perror("Data.bin");
+        free(values);
+        return EXIT_FAILURE;
+    }
     fseek(fileptr, 0, SEEK_END);                   // Jump to the end of the file
     filelen = ftell(fileptr);                      // Get the current byte offset in the file
     rewind(fileptr);                               // Jump back to the beginning of the file
 
-    buffer = (char *)calloc(0, filelen * sizeof(char));// Enough memory for the file
-    fread(buffer, filelen, 1, fileptr);            // Read in the entire file
+    buffer = (char *)calloc((size_t)filelen, sizeof(char));// Enough memory for the file
+    if (buffer == NULL)
+    {
+        fprintf(stderr, "Couldn't allocate read buffer\n");
+        fclose(fileptr);
+        free(values);
+        return EXIT_FAILURE;
+    }
+    if (fread(buffer, sizeof(char), (size_t)filelen, fileptr) != (size_t)filelen)
+    {
+        fprintf(stderr, "Failed to read complete compressed file\n");
+        fclose(fileptr);
+        free(buffer);
+        free(values);
+        return EXIT_FAILURE;
+    }            // Read in the entire file
     fclose(fileptr);                               // Close the file
 
     /// Decode / decompress data
@@ -239,7 +276,7 @@ void test (void)
     for (int i = 0; i < inputSize; i++)
     {
         newInputsize++;
-        if (input[i] == input[i+1])
+        if ((i + 1 < inputSize) && (input[i] == input[i+1]))
         {
             // Number match
             i++;
@@ -253,7 +290,7 @@ void test (void)
     for (int i = 0; i < inputSize; i++)
     {
         newInput[j] = input[i];
-        if (input[i] == input[i+1])
+        if ((i + 1 < inputSize) && (input[i] == input[i+1]))
         {
             // Match -> Set top
             newInput[j] |= 0x80;
